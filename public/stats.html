@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>МастерPROF CRM</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      padding-top: 60px;
+    }
+    .card-status {
+      font-size: 0.9rem;
+      font-weight: bold;
+    }
+
+    .menu-carousel {
+      overflow-x: auto;
+      white-space: nowrap;
+      background-color: #f9f9f9;
+      padding: 10px;
+      border-bottom: 1px solid #ccc;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .menu-inner {
+      display: inline-flex;
+      gap: 10px;
+    }
+
+    .menu-inner button {
+      flex: 0 0 auto;
+      padding: 8px 14px;
+      background-color: #ececec;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .menu-inner button:hover {
+      background-color: #dcdcdc;
+    }
+
+    .chart-container {
+      position: relative;
+      width: 100%;
+      max-width: 600px; /* максимум на ПК */
+      margin: 0 auto;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: auto !important;
+    }
+
+  </style>
+</head>
+<body>
+  <nav class="menu-carousel">
+    <div class="menu-inner">
+      <button onclick="window.location.href='index.html'">📋 Заявки</button>
+      <button onclick="window.location.href='clients.html'">👥 Клиенты</button>
+      <button onclick="window.location.href='add_order.html'">➕ Новый заказ</button>
+      <button onclick="window.location.href='stats.html'">📊 Статистика</button>
+      <button onclick="window.location.href='archive.html'">📖 Архив</button>
+    </div>
+  </nav>
+
+  <nav class="navbar fixed-top navbar-dark bg-dark">
+    <div class="container-fluid">
+      <span class="navbar-brand mb-0 h1">МастерPROF CRM</span>
+    </div>
+  </nav>
+
+  <div class="container mt-3">
+    <h5 class="mb-3">Статистика</h5>
+
+    <div class="bg-light p-3 rounded shadow-sm mb-4">
+      <div class="row g-3">
+        <div class="col-md-4 d-flex flex-column">
+          <label for="startDate" class="form-label">Начало периода</label>
+          <input type="date" id="startDate" class="form-control" style="height: 38px;">
+        </div>
+        <div class="col-md-4 d-flex flex-column">
+          <label for="endDate" class="form-label">Конец периода</label>
+          <input type="date" id="endDate" class="form-control" style="height: 38px;">
+        </div>
+        <div class="col-md-4 d-flex flex-column justify-content-end">
+          <button onclick="loadStats()" class="btn btn-primary" style="height: 38px;">Загрузить статистику</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="statsOutput" class="mb-4"></div>
+
+    <div class="row text-center mb-4">
+      <div class="col-md-4">
+        <div class="card">
+          <div class="card-body">
+            <h6 class="card-title text-muted">Выручка</h6>
+            <p class="h5" id="revenue">₽</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card">
+          <div class="card-body">
+            <h6 class="card-title text-muted">Средний чек</h6>
+            <p class="h5" id="avg-check">₽</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card">
+          <div class="card-body">
+            <h6 class="card-title text-muted">Новые клиенты</h6>
+            <p class="h5" id="new-clients">0</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <canvas id="statusChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    async function loadStats() {
+      const start = document.getElementById('startDate').value;
+      const end = document.getElementById('endDate').value;
+      
+      if (!start || !end) return alert("Выберите диапазон");
+
+      const res = await fetch(`/api/stats?start=${start}&end=${end}`);
+      const data = await res.json();
+
+      document.getElementById('revenue').innerText = `${data.totalRevenue} ₽`;
+      document.getElementById('avg-check').innerText = `${data.avgCheck} ₽`;
+      document.getElementById('new-clients').innerText = `${data.newClients}`;
+
+      document.getElementById('statsOutput').innerHTML = `
+        <p>📦 Всего заявок: <b>${data.totalOrders}</b></p>
+        <p>📅 Среднее в день: <b>${data.avgPerDay}</b></p>
+        <h6 class="mt-3">📌 Статусы заказов:</h6>
+        <ul>
+          ${data.statuses.map(s => `<li>${s.status}: ${s.count}</li>`).join('')}
+        </ul>
+      `;
+
+      const ctx = document.getElementById('statusChart').getContext('2d');
+      if (window.statusChartInstance) window.statusChartInstance.destroy();
+      window.statusChartInstance = new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: ['В ремонте', 'Ожидает запчасти', 'Готово', 'Оплачено', 'Отказ'],
+          datasets: [{
+            label: 'Заказы по статусу',
+            data: [
+              data.statusCounts['В ремонте'] || 0,
+              data.statusCounts['Ожидает запчасти'] || 0,
+              data.statusCounts['Готово'] || 0,
+              data.statusCounts['Оплачено'] || 0,
+              data.statusCounts['Отказ'] || 0
+            ],
+            backgroundColor: ['#3498db', '#f39c12', '#2ecc71', '#9b59b6', '#e74c3c']
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'bottom' },
+            title: {
+              display: true,
+              text: 'Распределение заказов по статусам',
+              font: {
+                size: 16 // Увеличение размера шрифта
+              }
+            }
+          }
+        }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const today = new Date();
+      const priorDate = new Date();
+      priorDate.setDate(today.getDate() - 7);
+
+      const formatDate = (d) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      const startStr = formatDate(priorDate);
+      const endStr = formatDate(today);
+
+      document.getElementById('startDate').value = startStr;
+      document.getElementById('endDate').value = endStr;
+
+      loadStats();
+    });
+  </script>
+</body>
+</html>

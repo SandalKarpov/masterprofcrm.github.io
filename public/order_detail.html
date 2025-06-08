@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Заявка | CRM Мастерская</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      padding-top: 60px;
+    }
+    .form-label {
+      font-weight: 500;
+    }
+
+    .photo-container {
+      display: flex;
+      flex-wrap: nowrap;   /* все в один ряд */
+      overflow-x: auto;    /* горизонтальный скролл если нужно */
+      gap: 10px;
+      padding: 8px 0;
+    }
+
+    .photo-container img {
+      width: 120px;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .photo-wrapper {
+      position: relative;
+      flex: 0 0 auto;      /* фиксированный размер блока */
+      width: 100px;
+      height: 100px;
+    }
+
+    .photo-item {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(255, 0, 0, 0.8);
+      border: none;
+      color: white;
+      font-size: 14px;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+      line-height: 18px;
+      padding: 0;
+    }
+
+    .delete-btn:hover {
+      background: rgba(200, 0, 0, 1);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Навигация -->
+  <nav class="navbar fixed-top navbar-dark bg-dark">
+    <div class="container-fluid">
+      <span class="navbar-brand mb-0 h1" id="headerTitle">Заявка</span>
+      <button class="btn btn-outline-light btn-sm" onclick="history.back()">← Назад</button>
+    </div>
+  </nav>
+
+  <!-- Контейнер -->
+  <div class="container mt-4">
+    <form id="orderForm">
+      <div class="mb-3">
+        <label class="form-label">Дата создания</label>
+        <input type="text" class="form-control" id="createdAt" disabled>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Имя клиента</label>
+        <input type="text" class="form-control" id="clientName" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Телефон</label>
+        <input type="tel" class="form-control" id="clientPhone" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Тип устройства</label>
+        <input type="text" class="form-control" id="deviceType">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Марка</label>
+        <input type="text" class="form-control" id="deviceBrand">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Модель</label>
+        <input type="text" class="form-control" id="deviceModel">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Описание проблемы</label>
+        <textarea class="form-control" id="problem" rows="3"></textarea>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Фотографии устройства</label>
+        <input type="file" class="form-control" id="devicePhotos" accept="image/*" multiple>
+      </div>
+
+      <div id="photoPreview" class="mb-3 d-flex flex-wrap gap-2"></div>
+      <div id="photo-container" class="photo-container"></div>
+
+
+      <div class="mb-3">
+        <label class="form-label">Полка хранения</label>
+        <select class="form-select" id="shelf">
+          <option value="А1">А1</option>
+          <option value="А2">А2</option>
+          <option value="А3">А3</option>
+          <option value="А4">А4</option>
+
+          <option value="Б1">Б1</option>
+          <option value="Б2">Б2</option>
+          <option value="Б3">Б3</option>
+          <option value="Б4">Б4</option>
+
+          <option value="В1">В1</option>
+          <option value="В2">В2</option>
+          <option value="В3">В3</option>
+          <option value="В4">В4</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Статус</label>
+        <select class="form-select" id="status">
+          <option value="В ремонте">В ремонте</option>
+          <option value="Ожидает запчасти">Ожидает запчасти</option>
+          <option value="Готово">Готово</option>
+          <option value="Оплачено">Оплачено</option>
+          <option value="Отказ">Отказ</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Стоимость ремонта</label>
+        <input type="number" class="form-control" id="price" name="price" placeholder="Стоимость ремонта (₽)" min="0" />
+      </div>
+
+      <!-- Кнопки -->
+      <div class="d-flex justify-content-between mt-4">
+        <button type="button" class="btn btn-danger" onclick="deleteOrder()">Удалить</button>
+        <div>
+          <button type="button" id="whatsappBtn" class="btn btn-outline-secondary me-2">✉️ Написать</button>
+          <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const orderId = new URLSearchParams(window.location.search).get('id');
+    
+    async function loadOrder() {
+      try {
+        const res = await fetch(`/api/orders/${orderId}`);
+        const order = await res.json();
+
+        document.getElementById('headerTitle').textContent = `Заявка #${order.id}`;
+        document.getElementById('createdAt').value = new Date(order.createdAt).toLocaleString('ru-RU');
+
+        document.getElementById('clientName').value = order.clientName || '';
+        document.getElementById('clientPhone').value = order.clientPhone || '';
+        document.getElementById('deviceType').value = order.deviceType || '';
+        document.getElementById('deviceBrand').value = order.deviceBrand || '';
+        document.getElementById('deviceModel').value = order.deviceModel || '';
+        document.getElementById('problem').value = order.problem || '';
+        document.getElementById('shelf').value = order.shelf || '';
+        document.getElementById('status').value = order.status || 'В ремонте';
+        document.getElementById('price').value = order.price || '';
+
+        // order — это объект с сервера
+        const photoContainer = document.getElementById('photo-container');
+        photoContainer.innerHTML = ''; // Очистить
+
+        if (order.photos && order.photos.length > 0) {
+          order.photos.forEach(photoUrl => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'photo-wrapper';
+
+            const img = document.createElement('img');
+            img.src = photoUrl;
+            img.className = 'rounded border';
+            img.style.maxWidth = '100px';
+            img.style.cursor = 'pointer';
+            img.onclick = () => openPhotoModal(photoUrl);
+
+            const delBtn = document.createElement('button');
+            delBtn.textContent = '×';
+            delBtn.className = 'delete-btn';
+            delBtn.style.transform = 'translate(50%, -50%)';
+            delBtn.onclick = async () => {
+              if (confirm('Удалить это фото?')) {
+                  await fetch(`/api/orders/${orderId}/delete-photo`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: photoUrl })
+                  });
+            loadOrder(); // перезагрузка фото
+        }
+        };
+
+    wrapper.appendChild(img);
+    wrapper.appendChild(delBtn);
+    photoContainer.appendChild(wrapper);
+});
+
+        }
+      } catch (err) {
+        alert('Ошибка загрузки данных заявки');
+        console.error(err);
+      }
+    }
+
+    async function saveOrder(event) {
+        event.preventDefault();
+
+        const formData = new FormData();
+        formData.append('clientName', document.getElementById('clientName').value);
+        formData.append('clientPhone', document.getElementById('clientPhone').value);
+        formData.append('deviceType', document.getElementById('deviceType').value);
+        formData.append('deviceBrand', document.getElementById('deviceBrand').value);
+        formData.append('deviceModel', document.getElementById('deviceModel').value);
+        formData.append('problem', document.getElementById('problem').value);
+        formData.append('shelf', document.getElementById('shelf').value);
+        formData.append('status', document.getElementById('status').value);
+        formData.append('price', document.getElementById('price').value);
+
+        const files = photoInput.files;
+        for (let i = 0; i < files.length; i++) {
+            formData.append('photos', files[i]);
+        }
+
+        try {
+            await fetch(`/api/orders/${orderId}`, {
+            method: 'PUT',
+            body: formData,
+            });
+            alert('Заявка обновлена!');
+            //window.location.href = 'index.html';
+            photoInput.value = '';       // очистить input файлов
+            photoPreview.innerHTML = ''; // очистить предпросмотр
+            loadOrder();
+        } catch (err) {
+            alert('Ошибка при сохранении');
+            console.error(err);
+        }
+    }
+
+
+    async function deleteOrder() {
+      const confirmDelete = confirm('Удалить заявку? Это действие необратимо.');
+      if (!confirmDelete) return;
+
+      try {
+        await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
+        alert('Заявка удалена');
+        window.location.href = 'index.html';
+      } catch (err) {
+        alert('Ошибка удаления');
+        console.error(err);
+      }
+    }
+
+    
+    function generateMessage(status, name, price) {
+      switch(status) {
+        case 'В ремонте':
+          return `Здравствуйте, ${name}! Ваш ремонт в процессе. Наш мастер сообщит вам, когда устройство будет готово. Спасибо за ожидание!`;
+
+        case 'Ожидает запчасти':
+          return `Здравствуйте, ${name}! Ваше устройство сейчас ожидает необходимую запчасть. Как только она поступит, мы сразу продолжим ремонт. Спасибо за понимание!`;
+
+        case 'Готово':
+          return `Здравствуйте, ${name}! Ваше устройство готово к выдаче. Сумма к оплате: ${price} руб. Ждём вас в мастерской с пн-пт 9:00-18:00. Спасибо!`;
+
+        case 'Оплачено':
+          return `Здравствуйте, ${name}! Спасибо за оплату. Если потребуется помощь или консультация — обращайтесь, мы всегда рады помочь!`;
+
+        case 'Отказ':
+          return `Здравствуйте, ${name}. К сожалению, по вашему устройству мы вынуждены отказать в ремонте. Если нужны детали — свяжитесь с нами для уточнения. Спасибо за понимание.`;
+
+        default:
+          return `Здравствуйте, ${name}! Мы обрабатываем вашу заявку. Спасибо за обращение в нашу мастерскую.`;
+      }
+    }
+
+
+    function sendWhatsAppMessage(name, status, price, phone) { 
+      const paymentLink = 'https://www.sberbank.com/sms/pbpn?requisiteNumber=79241654552';
+
+      let messageText = generateMessage(status, name, price);
+
+      // Добавляем ссылку на оплату только если статус "Готово" или "Оплачено"
+      if (status === 'Готово') {
+        messageText += `\n\nСсылка для оплаты: ${paymentLink}`;
+      }
+
+      const encodedMessage = encodeURIComponent(messageText);
+      const url = `https://wa.me/${phone}?text=${encodedMessage}`;
+
+      // Здесь отправка сообщения, например, открыть ссылку
+      window.open(url, '_blank');
+    }
+
+    const photoInput = document.getElementById('devicePhotos');
+    const photoPreview = document.getElementById('photoPreview');
+
+    // Загрузка и предпросмотр фото
+    photoInput.addEventListener('change', () => {
+        photoPreview.innerHTML = ''; // Очистка
+        Array.from(photoInput.files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.className = 'rounded border';
+                img.style.maxWidth = '100px';
+                img.style.maxHeight = '100px';
+                photoPreview.appendChild(img);
+            };
+            reader.readAsDataURL(file);
+        });
+    });
+
+    function openPhotoModal(url) {
+      const modalImg = document.getElementById('modalImage');
+      modalImg.src = url;
+      const modal = new bootstrap.Modal(document.getElementById('photoModal'));
+      modal.show();
+    }
+
+    document.getElementById('orderForm').addEventListener('submit', saveOrder);
+    document.getElementById('whatsappBtn').addEventListener('click', () => {
+      const name = document.getElementById('clientName').value.trim();
+      const status = document.getElementById('status').value;
+      const price = document.getElementById('price').value;
+      const phone = document.getElementById('clientPhone').value.trim();
+
+      if (!phone) {
+        alert('Введите телефон клиента');
+        return;
+      }
+      if (!name) {
+        alert('Введите имя клиента');
+        return;
+      }
+
+      sendWhatsAppMessage(name, status, price, phone);
+    });
+    
+    loadOrder();
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Модальное окно для просмотра фото -->
+  <div class="modal fade" id="photoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content bg-dark">
+        <div class="modal-body text-center p-0">
+          <img id="modalImage" src="" class="img-fluid rounded" alt="Просмотр фото">
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

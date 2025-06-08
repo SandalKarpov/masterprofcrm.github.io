@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Добавить заявку</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      max-width: 500px;
+      margin: auto;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      padding: 8px;
+      margin: 6px 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 1rem;
+      box-sizing: border-box;
+      color:#777;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #777;
+      background-color: #e1ebfa;
+    }
+
+    button {
+      padding: 8px 12px;
+      border: none;
+      background: #ececec;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background-color: #dcdcdc;
+    }
+  </style>
+</head>
+<body>
+
+  <a href="index.html" style="display:inline-block; margin-bottom: 20px; text-decoration: none;">
+    <button type="button" style="padding: 10px; background-color: #444; color: white; border: none; cursor: pointer;">
+      ⬅ Назад к заявкам
+    </button>
+  </a>
+
+
+  <h2>Новая заявка</h2>
+
+  <form id="orderForm">
+    <input type="text" name="clientName" placeholder="Имя клиента" required />
+    <input type="text" name="clientPhone" placeholder="Телефон" required />
+    <input type="text" name="deviceType" placeholder="Тип устройства" required />
+    <input type="text" name="deviceBrand" placeholder="Бренд" />
+    <input type="text" name="deviceModel" placeholder="Модель" />
+    <input type="text" name="serialNumber" placeholder="Серийный номер" />
+    <select name="shelf" required>
+      <option value="" disabled selected>Выберите полку хранения</option>
+      <option value="А1">А1</option>
+      <option value="А2">А2</option>
+      <option value="А3">А3</option>        
+      <option value="А4">А4</option>
+
+      <option value="Б1">Б1</option>
+      <option value="Б2">Б2</option>
+      <option value="Б3">Б3</option>        
+      <option value="Б4">Б4</option>
+
+      <option value="В1">В1</option>
+      <option value="В2">В2</option>
+      <option value="В3">В3</option>
+      <option value="В4">В4</option>
+    </select>
+    <textarea name="problem" placeholder="Описание неисправности" required></textarea>
+
+    <button type="submit">Сохранить заявку</button>
+  </form>
+
+  <p id="resultMsg"></p>
+
+  <script>
+    const form = document.getElementById('orderForm');
+    const resultMsg = document.getElementById('resultMsg');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData.entries());
+      data.status = "В ремонте"; 
+
+      try {
+        const response = await fetch('/api/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          resultMsg.textContent = '✅ Заявка успешно добавлена!';
+          form.reset();
+        } else {
+          resultMsg.textContent = '❌ Ошибка: ' + result.message;
+        }
+      } catch (error) {
+        resultMsg.textContent = '❌ Сетевая ошибка: ' + error.message;
+      }
+    });
+  </script>
+</body>
+</html>

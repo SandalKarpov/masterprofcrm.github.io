@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>МастерPROF CRM</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      padding-top: 60px;
+    }
+    .card-status {
+      font-size: 0.9rem;
+      font-weight: bold;
+    }
+    .menu-carousel {
+      overflow-x: auto;
+      white-space: nowrap;
+      background-color: #f9f9f9;
+      padding: 10px;
+      border-bottom: 1px solid #ccc;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .menu-inner {
+      display: inline-flex;
+      gap: 10px;
+    }
+
+    .menu-inner button {
+      flex: 0 0 auto;
+      padding: 8px 14px;
+      background-color: #ececec;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .menu-inner button:hover {
+      background-color: #dcdcdc;
+    }
+
+    table {
+      background: #fff;
+    }
+
+  </style>
+</head>
+<body>
+    <nav class="menu-carousel">
+        <div class="menu-inner">
+            <button onclick="window.location.href='index.html'">📋 Заявки</button>
+            <button onclick="window.location.href='clients.html'">👥 Клиенты</button>
+            <button onclick="window.location.href='add_order.html'">➕ Новый заказ</button>
+            <button onclick="window.location.href='stats.html'">📊 Статистика</button>
+            <button onclick="window.location.href='archive.html'">📖 Архив</button>
+        </div>
+    </nav>
+
+
+  <!-- Навигация -->
+  <nav class="navbar fixed-top navbar-dark bg-dark">
+    <div class="container-fluid">
+      <span class="navbar-brand mb-0 h1">МастерPROF CRM</span>
+    </div>
+  </nav>
+
+  <div class="container mt-3">
+    <h5 class="mb-3">Список клиентов</h5>
+  </div>
+
+  <div class="input-group mb-3">
+      <input type="text" class="form-control" id="searchInput" placeholder="Поиск по имени или телефону" />
+      <button class="btn btn-outline-secondary" onclick="loadClients()">🔍 Поиск</button>
+      <button class="btn btn-outline-danger" onclick="resetSearch()">✖ Сброс</button>
+    </div>
+
+    <!-- Таблица -->
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover">
+        <thead class="table-light">
+          <tr>
+            <th>Имя</th>
+            <th>Телефон</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody id="clientsTableBody">
+          <tr><td colspan="3" class="text-center text-muted">Загрузка...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+<script>
+    async function loadClients() {
+      const query = document.getElementById('searchInput').value.trim();
+      const res = await fetch('/api/clients');
+      let clients = await res.json();
+
+      if (query) {
+        clients = clients.filter(c =>
+          c.name.toLowerCase().includes(query.toLowerCase()) ||
+          c.phone.includes(query)
+        );
+      }
+
+      const tbody = document.getElementById('clientsTableBody');
+      tbody.innerHTML = '';
+
+      if (clients.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Ничего не найдено</td></tr>';
+        return;
+      }
+
+      for (const client of clients) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${client.name}</td>
+          <td>${client.phone}</td>
+          <td>
+            <div class="d-flex flex-column flex-sm-row gap-1">
+              <a href="index.html?phone=${client.phone}" class="btn btn-sm btn-primary w-100">📋 Посмотреть</a>
+              <button class="btn btn-sm btn-secondary w-100" onclick="editClient('${client.id}', '${client.name}', '${client.phone}')">✏️ Изменить</button>
+              <button class="btn btn-sm btn-danger w-100" onclick="deleteClient('${client.id}', '${client.name}')">🗑 Удалить</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function resetSearch() {
+      document.getElementById('searchInput').value = '';
+      loadClients();
+    }
+
+    let currentEditModal;
+
+    function editClient(id, name, phone) {
+      document.getElementById('editClientId').value = id;
+      document.getElementById('editName').value = name;
+      document.getElementById('editPhone').value = phone;
+
+      const modal = new bootstrap.Modal(document.getElementById('editModal'));
+      currentEditModal = modal;
+      modal.show();
+    }
+
+    async function saveClient() {
+      const id = document.getElementById('editClientId').value;
+      const name = document.getElementById('editName').value.trim();
+      const phone = document.getElementById('editPhone').value.trim();
+
+      if (!name || !phone) {
+        alert("Поля не могут быть пустыми");
+        return;
+      }
+
+      const allClientsRes = await fetch('/api/clients');
+      const allClients = await allClientsRes.json();
+      const exists = allClients.find(c => c.phone === phone && c.id !== id);
+
+      if (exists) {
+        alert("Клиент с таким номером уже существует.");
+        return;
+      }
+
+      const res = await fetch(`/api/clients/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, phone })
+      });
+
+      if (res.ok) {
+        currentEditModal.hide();
+        loadClients();
+      } else {
+        alert("Ошибка при сохранении");
+      }
+    }
+
+    async function deleteClient(id, name) {
+      if (!confirm(`Удалить клиента "${name}"? Это действие необратимо.`)) return;
+
+      const res = await fetch(`/api/clients/${id}`, { method: 'DELETE' });
+
+      if (res.ok) {
+        loadClients();
+      } else {
+        alert("Ошибка при удалении клиента.");
+      }
+    }
+
+    loadClients();
+  </script>
+  <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="editModalLabel">Редактировать клиента</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="editClientId">
+          <div class="mb-3">
+            <label class="form-label">Имя</label>
+            <input type="text" class="form-control" id="editName">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Телефон</label>
+            <input type="text" class="form-control" id="editPhone">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="button" class="btn btn-primary" onclick="saveClient()">💾 Сохранить</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Подключаем Popper и Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.min.js"></script>
+</body>
